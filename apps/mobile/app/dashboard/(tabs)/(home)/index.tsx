@@ -11,6 +11,7 @@ import { ProfileAvatarButton } from "@/components/settings/ProfileAvatarButton";
 import AndroidSearchBar from "@/components/ui/AndroidSearchBar";
 import { FAB } from "@/components/ui/FAB";
 import useAppSettings from "@/lib/settings";
+import { parseSharedText } from "@/lib/sharedText";
 import { useUploadAsset } from "@/lib/upload";
 import { useTranslation } from "@/lib/i18n/hooks";
 import { useMenuIconColors } from "@/lib/useMenuIconColors";
@@ -104,22 +105,17 @@ function useNewBookmarkActions(openNewBookmarkModal: () => void) {
           return;
         }
 
-        let isUrl = false;
-        try {
-          const parsed = new URL(contents);
-          if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-            isUrl = true;
-            sonnerToast.loading(t("home.saving_url"), { id: toastId });
-          }
-        } catch {
-          // not a valid URL — treat as text
-          sonnerToast.loading(t("home.saving_text"), { id: toastId });
-        }
+        const parsed = parseSharedText(contents);
+        sonnerToast.loading(
+          parsed.type === "link" ? t("home.saving_url") : t("home.saving_text"),
+          { id: toastId },
+        );
 
-        const resp = await (isUrl
+        const resp = await (parsed.type === "link"
           ? createBookmark.mutateAsync({
               type: BookmarkTypes.LINK,
-              url: new URL(contents).toString(),
+              url: parsed.url,
+              title: parsed.title,
               source: "mobile",
             })
           : createBookmark.mutateAsync({

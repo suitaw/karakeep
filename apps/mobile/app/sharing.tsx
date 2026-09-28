@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/Button";
 import { Text } from "@/components/ui/Text";
 import { useTranslation } from "@/lib/i18n/hooks";
 import useAppSettings from "@/lib/settings";
+import { parseSharedText } from "@/lib/sharedText";
 import { useUploadAsset } from "@/lib/upload";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 
 import { useTRPC } from "@karakeep/shared-react/trpc";
 import { BookmarkTypes, ZBookmark } from "@karakeep/shared/types/bookmarks";
@@ -56,12 +56,12 @@ function SaveBookmark({ setMode }: { setMode: (mode: Mode) => void }) {
         source: "mobile",
       });
     } else if (!isPending && shareIntent?.text) {
-      const val = z.string().url();
-      if (val.safeParse(shareIntent.text).success) {
-        // This is a URL, else treated as text
+      const parsed = parseSharedText(shareIntent.text);
+      if (parsed.type === "link") {
         mutate({
           type: BookmarkTypes.LINK,
-          url: shareIntent.text,
+          url: parsed.url,
+          title: parsed.title,
           source: "mobile",
         });
       } else {
