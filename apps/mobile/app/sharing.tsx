@@ -27,8 +27,16 @@ function SaveBookmark({ setMode }: { setMode: (mode: Mode) => void }) {
   const api = useTRPC();
   const queryClient = useQueryClient();
 
+  // Files still uploading from a multi-file share; the result is shown once
+  // the last one finishes so the sheet doesn't close mid-upload.
+  const pendingRef = useRef(0);
+
   const onSaved = (d: ZBookmark & { alreadyExists: boolean }) => {
     queryClient.invalidateQueries(api.bookmarks.getBookmarks.pathFilter());
+    pendingRef.current = Math.max(0, pendingRef.current - 1);
+    if (pendingRef.current > 0) {
+      return;
+    }
     setMode({
       type: d.alreadyExists ? "alreadyExists" : "success",
       bookmarkId: d.id,
@@ -71,12 +79,15 @@ function SaveBookmark({ setMode }: { setMode: (mode: Mode) => void }) {
           source: "mobile",
         });
       }
-    } else if (!isPending && shareIntent?.files) {
-      uploadAsset({
-        type: shareIntent.files[0].mimeType,
-        name: shareIntent.files[0].fileName ?? "",
-        uri: shareIntent.files[0].path,
-      });
+    } else if (!isPending && shareIntent?.files?.length) {
+      pendingRef.current = shareIntent.files.length;
+      for (const file of shareIntent.files) {
+        uploadAsset({
+          type: file.mimeType,
+          name: file.fileName ?? "",
+          uri: file.path,
+        });
+      }
     }
     if (hasShareIntent) {
       resetShareIntent();

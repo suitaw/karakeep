@@ -28,9 +28,16 @@ function useNewBookmarkActions(openNewBookmarkModal: () => void) {
   const uploadToastIdRef = useRef<string | number | null>(null);
   const createBookmark = useCreateBookmark();
 
+  // Images still uploading from the last multi-select; the success toast is
+  // shown once they have all finished.
+  const pendingUploadsRef = useRef(0);
   const { uploadAsset } = useUploadAsset(settings, {
     onSuccess: () => {
-      if (uploadToastIdRef.current !== null) {
+      pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current - 1);
+      if (
+        pendingUploadsRef.current === 0 &&
+        uploadToastIdRef.current !== null
+      ) {
         sonnerToast.success(t("home.image_saved"), {
           id: uploadToastIdRef.current,
         });
@@ -38,6 +45,7 @@ function useNewBookmarkActions(openNewBookmarkModal: () => void) {
       }
     },
     onError: (e) => {
+      pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current - 1);
       if (uploadToastIdRef.current !== null) {
         sonnerToast.error(e, { id: uploadToastIdRef.current });
         uploadToastIdRef.current = null;
@@ -63,11 +71,10 @@ function useNewBookmarkActions(openNewBookmarkModal: () => void) {
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
           quality: settings.imageQuality,
-          allowsMultipleSelection: false,
+          allowsMultipleSelection: true,
         });
         if (!result.canceled) {
-          const asset = result.assets[0];
-          if (!asset) {
+          if (result.assets.length === 0) {
             sonnerToast.dismiss(uploadToastIdRef.current);
             uploadToastIdRef.current = null;
             return;
@@ -75,11 +82,14 @@ function useNewBookmarkActions(openNewBookmarkModal: () => void) {
           sonnerToast.loading(t("home.uploading_image"), {
             id: uploadToastIdRef.current,
           });
-          uploadAsset({
-            type: asset.mimeType ?? "",
-            name: asset.fileName ?? "",
-            uri: asset.uri,
-          });
+          pendingUploadsRef.current = result.assets.length;
+          for (const asset of result.assets) {
+            uploadAsset({
+              type: asset.mimeType ?? "",
+              name: asset.fileName ?? "",
+              uri: asset.uri,
+            });
+          }
         } else {
           sonnerToast.dismiss(uploadToastIdRef.current);
           uploadToastIdRef.current = null;
