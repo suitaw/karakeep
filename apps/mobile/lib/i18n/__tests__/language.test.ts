@@ -13,6 +13,7 @@ vi.mock("expo-localization", () => ({
 
 import enMobile from "../locales/en.json";
 import plMobile from "../locales/pl.json";
+import zhMobile from "../locales/zh.json";
 import {
   FALLBACK_LANGUAGE,
   getDateFnsLocale,
@@ -303,5 +304,88 @@ describe("locale-aware date and number helpers", () => {
       locale: getDateFnsLocale(),
     });
     expect(text).toMatch(/temu/);
+  });
+});
+
+describe("Simplified Chinese (zh)", () => {
+  it.each([
+    [[{ languageTag: "zh" }], "zh"],
+    [[{ languageTag: "zh-CN" }], "zh"],
+    [[{ languageTag: "zh_CN" }], "zh"],
+    [[{ languageTag: "zh-Hans" }], "zh"],
+    [[{ languageTag: "zh-Hans-CN" }], "zh"],
+    [[{ languageTag: "ja-JP" }, { languageTag: "zh-Hans-CN" }], "zh"],
+  ] as const)("matches %j → %s", (locales, expected) => {
+    expect(matchSupportedLanguage(locales)).toBe(expected);
+  });
+
+  it.each([
+    [[{ languageTag: "zh-TW" }], "en"],
+    [[{ languageTag: "zh-HK" }], "en"],
+    [[{ languageTag: "zh-MO" }], "en"],
+    [[{ languageTag: "zh-Hant" }], "en"],
+    [[{ languageTag: "zh-Hant-TW" }], "en"],
+    [[{ languageTag: "zh_TW" }], "en"],
+    [[{ languageTag: "zh-TW" }, { languageTag: "pl-PL" }], "pl"],
+  ] as const)(
+    "does not serve Simplified Chinese to %j (→ %s)",
+    (locales, expected) => {
+      expect(matchSupportedLanguage(locales)).toBe(expected);
+    },
+  );
+
+  it("is a supported language and follows the system", () => {
+    expect(SUPPORTED_LANGUAGES).toContain("zh");
+    mockGetLocales.mockReturnValue([{ languageTag: "zh-Hans-CN" }]);
+    expect(getSystemLanguage()).toBe("zh");
+    expect(resolveAppLanguage("zh", "en")).toBe("zh");
+  });
+
+  it("has identical keys to English and no empty translations", () => {
+    const enKeys = new Set(flatKeys(enMobile));
+    const zhKeys = new Set(flatKeys(zhMobile));
+    const missing = [...enKeys].filter((k) => !zhKeys.has(k));
+    const extra = [...zhKeys].filter((k) => !enKeys.has(k));
+    expect({ missing, extra }).toEqual({ missing: [], extra: [] });
+    for (const key of zhKeys) {
+      const value = getByPath(zhMobile, key);
+      expect(typeof value === "string" && value.length > 0, key).toBe(true);
+    }
+  });
+
+  it("resolves mobile and shared web strings in Chinese", async () => {
+    await i18n.changeLanguage("zh");
+    const tMobile = i18n.getFixedT("zh", "mobile");
+    expect(tMobile("tabs.tags")).toBe("标签");
+    expect(tMobile("bookmarks.created", { date: "2024-01-15" })).toBe(
+      "创建于 2024-01-15",
+    );
+    const tWeb = i18n.getFixedT("zh", "translation");
+    expect(tWeb("common.bookmarks")).toBe("书签");
+  });
+
+  it("uses the single 'other' plural form", () => {
+    const rules = new Intl.PluralRules("zh");
+    for (const n of [0, 1, 2, 5, 21, 1.5]) {
+      expect(rules.select(n)).toBe("other");
+    }
+    const t = i18n.getFixedT("zh", "mobile");
+    expect(t("emoji.results", { count: 1 })).toBe("1 个结果");
+    expect(t("emoji.results", { count: 5 })).toBe("5 个结果");
+    expect(t("tags_tab.bookmarks", { count: 3 })).toBe("3 个书签");
+    expect(t("stats.item", { count: 2 })).toBe("项");
+  });
+
+  it("uses Chinese date and number locales", async () => {
+    await i18n.changeLanguage("zh");
+    expect(getIntlLocale()).toBe("zh");
+    expect(getDateFnsLocale().code).toBe("zh-CN");
+    expect(
+      new Intl.DateTimeFormat(getIntlLocale(), {
+        day: "numeric",
+        month: "long",
+      }).format(new Date(2024, 0, 15)),
+    ).toBe("1月15日");
+    await i18n.changeLanguage("en");
   });
 });

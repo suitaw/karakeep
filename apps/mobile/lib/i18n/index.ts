@@ -19,14 +19,16 @@
 //   complete `mobile`-namespace translations for.
 import i18next from "i18next";
 import type { Locale } from "date-fns";
-import { enUS, pl } from "date-fns/locale";
+import { enUS, pl, zhCN } from "date-fns/locale";
 import * as Localization from "expo-localization";
 import { initReactI18next } from "react-i18next";
 
 import enMobile from "./locales/en.json";
 import plMobile from "./locales/pl.json";
+import zhMobile from "./locales/zh.json";
 import enWeb from "./web-translations/en.json";
 import plWeb from "./web-translations/pl.json";
+import zhWeb from "./web-translations/zh.json";
 
 export const FALLBACK_LANGUAGE = "en";
 
@@ -36,7 +38,7 @@ export const FALLBACK_LANGUAGE = "en";
  * `web-translations/<lang>.json` (via the sync script) and
  * `locales/<lang>.json` exist.
  */
-export const SUPPORTED_LANGUAGES = ["en", "pl"] as const;
+export const SUPPORTED_LANGUAGES = ["en", "pl", "zh"] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
@@ -50,6 +52,10 @@ const resources = {
   pl: {
     mobile: plMobile,
     translation: plWeb,
+  },
+  zh: {
+    mobile: zhMobile,
+    translation: zhWeb,
   },
 } as const;
 
@@ -75,6 +81,11 @@ export function matchSupportedLanguage(
       return tag;
     }
     const base = tag.split("-")[0];
+    // "zh" ships Simplified Chinese only; don't serve it to Traditional
+    // Chinese locales (zh-Hant, zh-TW, zh-HK, zh-MO).
+    if (base === "zh" && /-(Hant|TW|HK|MO)(-|$)/i.test(tag)) {
+      continue;
+    }
     if (isSupportedLanguage(base)) {
       return base;
     }
@@ -142,6 +153,7 @@ export async function setAppLanguage(lng: SupportedLanguage): Promise<void> {
 const DATE_FNS_LOCALES: Record<SupportedLanguage, Locale> = {
   en: enUS,
   pl,
+  zh: zhCN,
 };
 
 /** date-fns locale matching the currently active app language. */
