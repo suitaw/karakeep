@@ -1,0 +1,60 @@
+name: Android APK (debug-signed)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup repo
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./tooling/github/setup
+
+      - name: Mobile i18n sync & parity
+        run: node tools/mobile-i18n-sync.mjs --check
+
+      - name: Mobile tests
+        working-directory: apps/mobile
+        run: pnpm test
+
+      - name: Mobile typecheck
+        working-directory: apps/mobile
+        run: pnpm typecheck
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: 'platform-tools'
+
+      # APP_VARIANT=development uses the ".dev" package id so the APK installs
+      # alongside the store build. Prebuild's release config signs with the
+      # generated debug keystore.
+      - name: Expo prebuild
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install --clean
+        env:
+          APP_VARIANT: development
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+        env:
+          APP_VARIANT: development
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: karakeep-android-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
