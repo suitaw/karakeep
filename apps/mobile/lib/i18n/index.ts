@@ -23,6 +23,8 @@ import { enUS, pl, zhCN } from "date-fns/locale";
 import * as Localization from "expo-localization";
 import { initReactI18next } from "react-i18next";
 
+import { installPluralRulesIfMissing } from "./plural-rules";
+
 import enMobile from "./locales/en.json";
 import plMobile from "./locales/pl.json";
 import zhMobile from "./locales/zh.json";
@@ -116,6 +118,9 @@ export function resolveAppLanguage(
   }
   return isSupportedLanguage(override) ? override : FALLBACK_LANGUAGE;
 }
+
+// Must run before init: i18next reads Intl.PluralRules when it sets up.
+installPluralRulesIfMissing();
 
 export const i18n = i18next.createInstance();
 
